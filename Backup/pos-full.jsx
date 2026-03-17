@@ -399,8 +399,8 @@ export default function FullPOS() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(perfRows), "Product Performance");
 
     // ── Sheet 4: Inventory ──
-    const invRows = [["Product", "SKU", "Category", "Current Stock", "Unit", "Low Stock Threshold", "Status", "Date Added"]];
-    products.forEach((p) => invRows.push([p.name, p.sku, p.category, p.stock, p.unit, p.lowStockThreshold, p.stock <= p.lowStockThreshold ? "LOW" : "OK", p.createdAt ? fmtDate(p.createdAt) : ""]));
+    const invRows = [["Product", "SKU", "Category", "Current Stock", "Unit", "Low Stock Threshold", "Status"]];
+    products.forEach((p) => invRows.push([p.name, p.sku, p.category, p.stock, p.unit, p.lowStockThreshold, p.stock <= p.lowStockThreshold ? "LOW" : "OK"]));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(invRows), "Inventory");
 
     // ── Sheet 5: Customers ──
@@ -968,14 +968,8 @@ export default function FullPOS() {
                   <button onClick={() => {
                     if (!editProduct.name || !editProduct.cost || !editProduct.price) { notify("Fill required fields!", "error"); return; }
                     const p = { ...editProduct, cost: Number(editProduct.cost), price: Number(editProduct.price), wholesalePrice: Number(editProduct.wholesalePrice) || 0, stock: Number(editProduct.stock) || 0, lowStockThreshold: Number(editProduct.lowStockThreshold) || 10 };
-                    if (p.id) { 
-                      p.updatedAt = new Date().toISOString();
-                      setProducts((prev) => prev.map((pp) => pp.id === p.id ? p : pp)); 
-                    } else { 
-                      p.id = ID(); 
-                      p.createdAt = new Date().toISOString();
-                      setProducts((prev) => [...prev, p]); 
-                    }
+                    if (p.id) { setProducts((prev) => prev.map((pp) => pp.id === p.id ? p : pp)); }
+                    else { p.id = ID(); setProducts((prev) => [...prev, p]); }
                     setEditProduct(null);
                     notify(p.id ? "Product updated!" : "Product added!");
                   }} style={S.btn("#059669")}>{Icons.check} Save</button>
@@ -989,7 +983,7 @@ export default function FullPOS() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                 <thead>
                   <tr style={{ borderBottom: "2px solid #e5e7eb" }}>
-                    {["Product", "SKU", "Category", "Cost", "Retail", "Wholesale", "Margin", "Stock", "Date Added", "Actions"].map((h) => (
+                    {["Product", "SKU", "Category", "Cost", "Retail", "Wholesale", "Margin", "Stock", "Actions"].map((h) => (
                       <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 800, color: "#6b7280", fontSize: "11px", textTransform: "uppercase" }}>{h}</th>
                     ))}
                   </tr>
@@ -1034,7 +1028,6 @@ export default function FullPOS() {
                             }} style={{ fontSize: "10px", background: "#f3f4f6", border: "none", borderRadius: "4px", padding: "3px 6px", cursor: "pointer", fontWeight: 700, color: "#6b7280" }}>+N</button>
                           </div>
                         </td>
-                        <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: "12px" }}>{p.createdAt ? fmtDate(p.createdAt) : "—"}</td>
                         <td style={{ padding: "10px 12px" }}>
                           <div style={{ display: "flex", gap: "4px" }}>
                             <button onClick={() => setEditProduct({ ...p, cost: String(p.cost), price: String(p.price), wholesalePrice: String(p.wholesalePrice || ""), stock: String(p.stock), lowStockThreshold: String(p.lowStockThreshold), image: p.image || "" })}
