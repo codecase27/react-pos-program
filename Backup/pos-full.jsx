@@ -900,6 +900,20 @@ export default function FullPOS() {
               </div>
             </div>
 
+            {/* Inventory Value Summary */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "20px" }}>
+              {[
+                { l: "Total Items in Stock", v: products.reduce((s, p) => s + (p.stock || 0), 0), c: "#374151", icon: "📦" },
+                { l: "Total Inventory Cost", v: fmt(products.reduce((s, p) => s + ((p.cost || 0) * (p.stock || 0)), 0)), c: "#dc2626", icon: "💰" },
+                { l: "Total Retail Value", v: fmt(products.reduce((s, p) => s + ((p.price || 0) * (p.stock || 0)), 0)), c: "#059669", icon: "🏷️" },
+              ].map((s) => (
+                <div key={s.l} style={{ ...S.card, padding: "14px", borderLeft: `4px solid ${s.c}` }}>
+                  <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 700, marginBottom: "4px" }}>{s.icon} {s.l}</div>
+                  <div style={{ fontFamily: S.mono, fontSize: "18px", fontWeight: 800, color: s.c }}>{s.v}</div>
+                </div>
+              ))}
+            </div>
+
             {/* Low Stock Alerts */}
             {lowStockProducts.length > 0 && (
               <div style={{ ...S.card, padding: "14px 16px", marginBottom: "16px", borderLeft: "4px solid #f59e0b", background: "#fffbeb" }}>

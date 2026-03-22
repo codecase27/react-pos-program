@@ -609,7 +609,7 @@ export default function FullPOS() {
                       style={{ ...S.card, padding: "12px", cursor: outOfStock ? "not-allowed" : "pointer", border: `2px solid ${inCart ? cc.border : "#e5e7eb"}`, background: outOfStock ? "#f9fafb" : inCart ? cc.light : "#fff", textAlign: "left", position: "relative", opacity: outOfStock ? 0.5 : 1, transition: "all 0.12s" }}>
                       {inCart && <span style={{ position: "absolute", top: "-8px", right: "-8px", background: cc.border, color: "#fff", width: "22px", height: "22px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 800 }}>{inCart.qty}</span>}
                       {lowStock && <span style={{ position: "absolute", top: "6px", right: "6px", background: "#fef3c7", color: "#92400e", fontSize: "9px", fontWeight: 800, padding: "1px 5px", borderRadius: "4px" }}>LOW</span>}
-                      {p.image && <img src={p.image} alt={p.name} style={{ width: "100%", height: "72px", objectFit: "cover", borderRadius: "6px", marginBottom: "6px" }} />}
+                      {p.image && <img src={p.image} alt={p.name} style={{ width: "100%", height: "100px", objectFit: "cover", borderRadius: "6px", marginBottom: "6px" }} />}
                       <div style={{ fontWeight: 700, fontSize: "13px", marginBottom: "2px", lineHeight: "1.2" }}>{p.name}</div>
                       <div style={{ fontSize: "10px", color: "#9ca3af" }}>{p.sku}</div>
                       <div style={{ fontFamily: S.mono, fontSize: "14px", fontWeight: 700, color: priceMode === "wholesale" ? "#7c3aed" : cc.text, marginTop: "4px" }}>
@@ -898,6 +898,19 @@ export default function FullPOS() {
                   setEditProduct({ id: null, name: "", sku: "", cost: "", price: "", wholesalePrice: "", category: "Other", stock: "", lowStockThreshold: 10, unit: "pc", barcode: "", image: "" });
                 }} style={S.btn()}>{Icons.plus} Add Product</button>
               </div>
+            </div>
+
+            {/* Inventory Value Summary */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "20px" }}>
+              {[
+                { l: "Total Items in Stock", v: products.reduce((s, p) => s + (p.stock || 0), 0), c: "#374151", icon: "📦" },
+                { l: "Total Inventory Cost", v: fmt(products.reduce((s, p) => s + ((p.cost || 0) * (p.stock || 0)), 0)), c: "#dc2626", icon: "💰" },
+              ].map((s) => (
+                <div key={s.l} style={{ ...S.card, padding: "14px", borderLeft: `4px solid ${s.c}` }}>
+                  <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 700, marginBottom: "4px" }}>{s.icon} {s.l}</div>
+                  <div style={{ fontFamily: S.mono, fontSize: "18px", fontWeight: 800, color: s.c }}>{s.v}</div>
+                </div>
+              ))}
             </div>
 
             {/* Low Stock Alerts */}
