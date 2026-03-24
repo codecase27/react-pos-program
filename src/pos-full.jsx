@@ -11,6 +11,10 @@ const pct = (a, b) => (b ? ((a / b) * 100).toFixed(1) : "0") + "%";
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
 // ─── DEFAULT DATA ───
+const USERS = [
+  { username: "taiy", pass: "Vgtbhatv423" },
+  { username: "ning", pass: "54571212" }
+];
 const DEFAULT_CATS = ["Drinks", "Food", "Snacks", "Other"];
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "Lao Coffee", sku: "DRK-001", cost: 8000, price: 15000, wholesalePrice: 12000, category: "Drinks", stock: 100, lowStockThreshold: 10, unit: "cup", barcode: "8850001" },
@@ -28,7 +32,19 @@ const TAX_RATE = 0; // Set to e.g. 0.10 for 10% tax
 // ─── STORAGE HELPERS ───
 const hasNativeStorage = () => typeof window !== "undefined" && window.storage && typeof window.storage.get === "function";
 
+const API_BASE_URL = "/api";
+
 const loadData = async (key, fallback) => {
+  try {
+    const endpoint = key.replace("pos2-", ""); // transforms 'pos2-products' to 'products'
+    const res = await fetch(`${API_BASE_URL}/${endpoint}`);
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn(`Backend load failed for ${key}, falling back to local storage.`);
+  }
+
   try {
     if (hasNativeStorage()) {
       const r = await window.storage.get(key);
@@ -40,6 +56,17 @@ const loadData = async (key, fallback) => {
 };
 
 const saveData = async (key, val) => {
+  try {
+    const endpoint = key.replace("pos2-", "");
+    await fetch(`${API_BASE_URL}/${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: val })
+    });
+  } catch (err) {
+    console.warn(`Backend save failed for ${key}, falling back to local storage.`);
+  }
+
   try {
     const serialized = JSON.stringify(val);
     if (hasNativeStorage()) { await window.storage.set(key, serialized); }
@@ -73,6 +100,7 @@ const Icons = {
   cart: <Icon d={<><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></>} />,
   hold: <Icon d={<><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M12 8v8M8 12h8"/></>} />,
   star: <Icon d={<><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></>} />,
+  logout: <Icon d={<><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></>} />,
 };
 
 // ─── CATEGORY COLORS ───
@@ -112,6 +140,12 @@ export default function FullPOS() {
   });
   const [loaded, setLoaded] = useState(false);
   const barcodeRef = useRef(null);
+
+  // ── Login State ──
+  const [isLoggedIn, setIsLoggedIn] = useState(() => typeof sessionStorage !== "undefined" && sessionStorage.getItem("pos_logged_in") === "true");
+  const [currentUser, setCurrentUser] = useState(() => typeof sessionStorage !== "undefined" ? sessionStorage.getItem("pos_current_user") : "");
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
 
   // ── Load/Save ──
   useEffect(() => {
@@ -440,12 +474,81 @@ export default function FullPOS() {
     { id: "settings", label: "Settings", icon: Icons.settings },
   ];
 
+  const handleLogin = () => {
+    const user = USERS.find((u) => u.username === loginUsername && u.pass === loginPassword);
+    if (user) {
+      setIsLoggedIn(true);
+      setCurrentUser(user.username);
+      sessionStorage.setItem("pos_logged_in", "true");
+      sessionStorage.setItem("pos_current_user", user.username);
+      setLoginUsername("");
+      setLoginPassword("");
+    } else {
+      notify("Invalid username or password", "error");
+    }
+  };
+
+  const handleLogout = () => { setIsLoggedIn(false); setCurrentUser(""); sessionStorage.removeItem("pos_logged_in"); sessionStorage.removeItem("pos_current_user"); };
+
   const filteredProducts = products.filter((p) =>
     (catFilter === "All" || p.category === catFilter) &&
     (p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()) || (p.barcode || "").includes(search))
   );
 
   // ── RENDER ──
+  if (!loaded) return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: S.font, background: S.bg, color: "#111827" }}>Loading...</div>;
+
+  if (!isLoggedIn) {
+    return (
+      <div style={{ fontFamily: S.font, background: S.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#111827" }}>
+        <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+        <style>{`
+          @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+          .fade-in{animation:fadeIn 0.25s ease}
+        `}</style>
+        {toast && (
+          <div style={{ position: "fixed", top: 20, right: 20, padding: "12px 22px", borderRadius: "10px", color: "#fff", fontWeight: 700, fontSize: "13px", zIndex: 9999, boxShadow: "0 8px 30px rgba(0,0,0,0.18)", background: toast.type === "error" ? "#dc2626" : toast.type === "info" ? "#2563eb" : "#059669" }} className="fade-in">
+            {toast.msg}
+          </div>
+        )}
+        <div style={{ ...S.card, padding: "32px", width: "320px", textAlign: "center" }} className="fade-in">
+          <div style={{ fontSize: "48px", marginBottom: "16px" }}>🏪</div>
+          <h2 style={{ margin: "0 0 24px", fontWeight: 900 }}>{storeSettings.name} Login</h2>
+          
+          <div style={{ marginBottom: "12px", textAlign: "left" }}>
+            <div style={S.label}>Username</div>
+            <input 
+              type="text" 
+              placeholder="Enter username" 
+              value={loginUsername} 
+              onChange={(e) => setLoginUsername(e.target.value)} 
+              onKeyDown={(e) => { if (e.key === "Enter") document.getElementById("loginPass").focus(); }}
+              style={{ ...S.input, fontSize: "16px" }} 
+              autoFocus
+            />
+          </div>
+
+          <div style={{ marginBottom: "24px", textAlign: "left" }}>
+            <div style={S.label}>Password</div>
+            <input 
+              id="loginPass"
+              type="password" 
+              placeholder="Enter password" 
+              value={loginPassword} 
+              onChange={(e) => setLoginPassword(e.target.value)} 
+              onKeyDown={(e) => { if (e.key === "Enter") handleLogin(); }}
+              style={{ ...S.input, fontSize: "16px" }} 
+            />
+          </div>
+
+          <button onClick={handleLogin} style={{ ...S.btn("#059669"), width: "100%", justifyContent: "center", padding: "12px", fontSize: "16px" }}>
+            Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ fontFamily: S.font, background: S.bg, minHeight: "100vh", display: "flex", color: "#111827" }}>
       <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
@@ -531,16 +634,21 @@ export default function FullPOS() {
           </button>
         ))}
         {/* Low stock badge */}
-        {lowStockProducts.length > 0 && (
-          <div style={{ marginTop: "auto", marginBottom: "16px", position: "relative" }}>
-            <button onClick={() => setActiveTab("products")} style={{ width: "40px", height: "40px", border: "none", borderRadius: "10px", background: "#fef3c7", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#92400e" }}>
-              {Icons.alert}
-            </button>
-            <span style={{ position: "absolute", top: "-4px", right: "-4px", background: "#dc2626", color: "#fff", fontSize: "10px", fontWeight: 800, width: "18px", height: "18px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {lowStockProducts.length}
-            </span>
-          </div>
-        )}
+        <div style={{ marginTop: "auto", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "16px", alignItems: "center" }}>
+          {lowStockProducts.length > 0 && (
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setActiveTab("products")} style={{ width: "40px", height: "40px", border: "none", borderRadius: "10px", background: "#fef3c7", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#92400e" }}>
+                {Icons.alert}
+              </button>
+              <span style={{ position: "absolute", top: "-4px", right: "-4px", background: "#dc2626", color: "#fff", fontSize: "10px", fontWeight: 800, width: "18px", height: "18px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {lowStockProducts.length}
+              </span>
+            </div>
+          )}
+          <button onClick={handleLogout} style={{ width: "40px", height: "40px", border: "none", borderRadius: "10px", background: "#1f2937", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af" }} title={`Logout (${currentUser})`}>
+            {Icons.logout}
+          </button>
+        </div>
       </div>
 
       {/* ── Main Content ── */}
