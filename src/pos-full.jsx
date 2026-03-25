@@ -167,6 +167,19 @@ export default function FullPOS() {
   const [isWholesale, setIsWholesale] = useState(() => {
     return typeof window !== "undefined" && window.location.hash === "#wholesale";
   });
+  const [storeNames, setStoreNames] = useState({ pos2: "Main Store", pos3: "Second Store" });
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      (async () => {
+        const [s2, s3] = await Promise.all([
+          loadData("pos2", "settings", { name: "Main Store" }),
+          loadData("pos3", "settings", { name: "Second Store" }),
+        ]);
+        setStoreNames({ pos2: s2?.name || "Main Store", pos3: s3?.name || "Second Store" });
+      })();
+    }
+  }, [isLoggedIn]);
 
   // ── Load/Save ──
   useEffect(() => {
@@ -588,8 +601,8 @@ export default function FullPOS() {
               }} 
               style={{ ...S.input, fontSize: "16px", cursor: "pointer", background: "#fff" }}
             >
-              <option value="pos2">Main Store</option>
-              <option value="pos3">Second Store</option>
+              <option value="pos2">{storeNames.pos2}</option>
+              <option value="pos3">{storeNames.pos3}</option>
             </select>
           </div>
 
