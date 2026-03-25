@@ -794,6 +794,9 @@ export default function FullPOS() {
               </span>
             </div>
           )}
+          <button onClick={() => { setStoreMode(true); window.location.hash = ""; }} style={{ width: "40px", height: "40px", border: "none", borderRadius: "10px", background: "#059669", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "18px" }} title="View Storefront">
+            🛍️
+          </button>
           <button onClick={handleLogout} style={{ width: "40px", height: "40px", border: "none", borderRadius: "10px", background: "#1f2937", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af" }} title={`Logout (${currentUser})`}>
             {Icons.logout}
           </button>
