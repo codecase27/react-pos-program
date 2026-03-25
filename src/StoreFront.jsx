@@ -76,14 +76,19 @@ export default function StoreFront({ products, categories, storeSettings, onPlac
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <h1 style={{ margin: 0, fontWeight: 900, fontSize: "20px" }}>{storeSettings?.name || "Store"} {isWholesale && <span style={{ color: "#7c3aed" }}>Wholesale</span>}</h1>
         </div>
-        <button onClick={() => setShowCart(true)} style={{ ...S.btn("#f3f4f6", "#111827"), position: "relative" }}>
-          🛒 Cart
-          {cart.length > 0 && (
-            <span style={{ position: "absolute", top: "-8px", right: "-8px", background: "#dc2626", color: "#fff", borderRadius: "50%", width: "20px", height: "20px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>
-              {cart.reduce((s, c) => s + c.qty, 0)}
-            </span>
-          )}
-        </button>
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          <button onClick={() => { window.location.hash = "#login"; }} style={{ ...S.btn("transparent", "#6b7280"), padding: "6px" }}>
+            🔐 Login
+          </button>
+          <button onClick={() => setShowCart(true)} style={{ ...S.btn("#f3f4f6", "#111827"), position: "relative" }}>
+            🛒 Cart
+            {cart.length > 0 && (
+              <span style={{ position: "absolute", top: "-8px", right: "-8px", background: "#dc2626", color: "#fff", borderRadius: "50%", width: "20px", height: "20px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>
+                {cart.reduce((s, c) => s + c.qty, 0)}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Main Content */}

@@ -35,43 +35,44 @@ const hasNativeStorage = () => typeof window !== "undefined" && window.storage &
 
 const API_BASE_URL = "/api";
 
-const loadData = async (key, fallback) => {
+const loadData = async (storeId, key, fallback) => {
   try {
-    const endpoint = key.replace("pos2-", ""); // transforms 'pos2-products' to 'products'
-    const res = await fetch(`${API_BASE_URL}/${endpoint}`);
+    // Pass storeId as a query param so the backend can separate data
+    const res = await fetch(`${API_BASE_URL}/${key}?store=${storeId}`);
     if (res.ok) {
       return await res.json();
     }
   } catch (err) {
-    console.warn(`Backend load failed for ${key}, falling back to local storage.`);
+    console.warn(`Backend load failed for ${storeId}-${key}, falling back to local storage.`);
   }
 
   try {
+    const storageKey = `${storeId}-${key}`;
     if (hasNativeStorage()) {
-      const r = await window.storage.get(key);
+      const r = await window.storage.get(storageKey);
       return r ? JSON.parse(r.value) : fallback;
     }
-    const raw = localStorage.getItem(key);
+    const raw = localStorage.getItem(storageKey);
     return raw ? JSON.parse(raw) : fallback;
   } catch { return fallback; }
 };
 
-const saveData = async (key, val) => {
+const saveData = async (storeId, key, val) => {
   try {
-    const endpoint = key.replace("pos2-", "");
-    await fetch(`${API_BASE_URL}/${endpoint}`, {
+    await fetch(`${API_BASE_URL}/${key}?store=${storeId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ data: val })
     });
   } catch (err) {
-    console.warn(`Backend save failed for ${key}, falling back to local storage.`);
+    console.warn(`Backend save failed for ${storeId}-${key}, falling back to local storage.`);
   }
 
   try {
+    const storageKey = `${storeId}-${key}`;
     const serialized = JSON.stringify(val);
-    if (hasNativeStorage()) { await window.storage.set(key, serialized); }
-    else { localStorage.setItem(key, serialized); }
+    if (hasNativeStorage()) { await window.storage.set(storageKey, serialized); }
+    else { localStorage.setItem(storageKey, serialized); }
   } catch {}
 };
 
@@ -147,6 +148,17 @@ export default function FullPOS() {
   const [currentUser, setCurrentUser] = useState(() => typeof sessionStorage !== "undefined" ? sessionStorage.getItem("pos_current_user") : "");
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [storeId, setStoreId] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlStore = params.get("store");
+      if (urlStore) {
+        sessionStorage.setItem("pos_store_id", urlStore);
+        return urlStore;
+      }
+    }
+    return typeof sessionStorage !== "undefined" ? sessionStorage.getItem("pos_store_id") || "pos2" : "pos2";
+  });
   const [storeMode, setStoreMode] = useState(() => {
     if (typeof window !== "undefined" && window.location.hash === "#login") return false;
     if (typeof window !== "undefined" && window.location.hash === "#wholesale") return true;
@@ -159,23 +171,24 @@ export default function FullPOS() {
   // ── Load/Save ──
   useEffect(() => {
     (async () => {
+      setLoaded(false);
       const [p, s, c, h, st] = await Promise.all([
-        loadData("pos2-products", DEFAULT_PRODUCTS),
-        loadData("pos2-sales", []),
-        loadData("pos2-customers", []),
-        loadData("pos2-held", []),
-        loadData("pos2-settings", storeSettings),
+        loadData(storeId, "products", DEFAULT_PRODUCTS),
+        loadData(storeId, "sales", []),
+        loadData(storeId, "customers", []),
+        loadData(storeId, "held", []),
+        loadData(storeId, "settings", { name: storeId === "pos2" ? "Main Store" : "Second Store", phone: "", address: "", taxRate: 0, currency: "₭", receiptFooter: "Thank you for your visit!" }),
       ]);
       setProducts(p); setSales(s); setCustomers(c); setHeldOrders(h); setStoreSettings(st);
       setLoaded(true);
     })();
-  }, []);
+  }, [storeId]);
 
-  useEffect(() => { if (loaded) saveData("pos2-products", products); }, [products, loaded]);
-  useEffect(() => { if (loaded) saveData("pos2-sales", sales); }, [sales, loaded]);
-  useEffect(() => { if (loaded) saveData("pos2-customers", customers); }, [customers, loaded]);
-  useEffect(() => { if (loaded) saveData("pos2-held", heldOrders); }, [heldOrders, loaded]);
-  useEffect(() => { if (loaded) saveData("pos2-settings", storeSettings); }, [storeSettings, loaded]);
+  useEffect(() => { if (loaded) saveData(storeId, "products", products); }, [products, loaded, storeId]);
+  useEffect(() => { if (loaded) saveData(storeId, "sales", sales); }, [sales, loaded, storeId]);
+  useEffect(() => { if (loaded) saveData(storeId, "customers", customers); }, [customers, loaded, storeId]);
+  useEffect(() => { if (loaded) saveData(storeId, "held", heldOrders); }, [heldOrders, loaded, storeId]);
+  useEffect(() => { if (loaded) saveData(storeId, "settings", storeSettings); }, [storeSettings, loaded, storeId]);
 
   // ── Listen for hidden login URL shortcut ──
   useEffect(() => {
@@ -564,6 +577,22 @@ export default function FullPOS() {
           <div style={{ fontSize: "48px", marginBottom: "16px" }}>🏪</div>
           <h2 style={{ margin: "0 0 24px", fontWeight: 900 }}>{storeSettings.name} Login</h2>
           
+          <div style={{ marginBottom: "12px", textAlign: "left" }}>
+            <div style={S.label}>Select Store</div>
+            <select 
+              value={storeId} 
+              onChange={(e) => {
+                setLoaded(false); // Prevents saving old store's data into the new store state
+                setStoreId(e.target.value);
+                sessionStorage.setItem("pos_store_id", e.target.value);
+              }} 
+              style={{ ...S.input, fontSize: "16px", cursor: "pointer", background: "#fff" }}
+            >
+              <option value="pos2">Main Store</option>
+              <option value="pos3">Second Store</option>
+            </select>
+          </div>
+
           <div style={{ marginBottom: "12px", textAlign: "left" }}>
             <div style={S.label}>Username</div>
             <input 

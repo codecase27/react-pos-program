@@ -1,0 +1,11 @@
+[33m0af6fa5[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m HEAD@{0}: commit: Added " Login Page, separate login page, storefront page, wholesale storefront page "
+[33m7b96821[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{1}: commit: Added "Login System"
+[33md797e6e[m HEAD@{2}: commit: Edit "Resized Product Thumbnail"
+[33mba10dea[m HEAD@{3}: checkout: moving from main to main
+[33mba10dea[m HEAD@{4}: commit: Add Date on Inventory and backup some pos-full.jsx
+[33m1fe77af[m HEAD@{5}: commit: Four test commit
+[33m057dd8e[m[33m ([m[1;31morigin/second[m[33m)[m HEAD@{6}: commit: Third Commit test
+[33ma1e0d17[m HEAD@{7}: commit: Add author name to README.md
+[33m2ebfa1c[m HEAD@{8}: commit: Second test commit :)
+[33m3a17726[m HEAD@{9}: Branch: renamed refs/heads/main to refs/heads/main
+[33m3a17726[m HEAD@{11}: commit (initial): first commit
