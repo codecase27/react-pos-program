@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import * as XLSX from "xlsx";
+import StoreFront from "./StoreFront";
 
 // ─── UTILS ───
 const ID = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -146,6 +147,14 @@ export default function FullPOS() {
   const [currentUser, setCurrentUser] = useState(() => typeof sessionStorage !== "undefined" ? sessionStorage.getItem("pos_current_user") : "");
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [storeMode, setStoreMode] = useState(() => {
+    if (typeof window !== "undefined" && window.location.hash === "#login") return false;
+    if (typeof window !== "undefined" && window.location.hash === "#wholesale") return true;
+    return !(typeof sessionStorage !== "undefined" && sessionStorage.getItem("pos_logged_in") === "true");
+  });
+  const [isWholesale, setIsWholesale] = useState(() => {
+    return typeof window !== "undefined" && window.location.hash === "#wholesale";
+  });
 
   // ── Load/Save ──
   useEffect(() => {
@@ -167,6 +176,23 @@ export default function FullPOS() {
   useEffect(() => { if (loaded) saveData("pos2-customers", customers); }, [customers, loaded]);
   useEffect(() => { if (loaded) saveData("pos2-held", heldOrders); }, [heldOrders, loaded]);
   useEffect(() => { if (loaded) saveData("pos2-settings", storeSettings); }, [storeSettings, loaded]);
+
+  // ── Listen for hidden login URL shortcut ──
+  useEffect(() => {
+    const handleHashChange = () => {
+      if (window.location.hash === "#login") {
+        setStoreMode(false);
+        setIsWholesale(false);
+      } else if (window.location.hash === "#wholesale") {
+        setStoreMode(true);
+        setIsWholesale(true);
+      } else {
+        setIsWholesale(false);
+      }
+    };
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
 
   const notify = (msg, type = "success") => {
     setToast({ msg, type });
@@ -237,6 +263,17 @@ export default function FullPOS() {
     setSelectedCustomer(held.customer || null);
     setHeldOrders((p) => p.filter((h) => h.id !== heldId));
     notify("Order recalled");
+  };
+
+  const handlePlaceOnlineOrder = (storeCart, customerInfo) => {
+    const newOrder = {
+      id: ID(),
+      cart: storeCart.map(item => ({ ...item, itemDiscount: 0 })),
+      discount: { type: "none", value: 0 },
+      customer: { name: customerInfo.name, isOnline: true },
+      date: new Date().toISOString()
+    };
+    setHeldOrders((p) => [...p, newOrder]);
   };
 
   // ── Complete Sale ──
@@ -488,7 +525,7 @@ export default function FullPOS() {
     }
   };
 
-  const handleLogout = () => { setIsLoggedIn(false); setCurrentUser(""); sessionStorage.removeItem("pos_logged_in"); sessionStorage.removeItem("pos_current_user"); };
+  const handleLogout = () => { setIsLoggedIn(false); setCurrentUser(""); setStoreMode(true); sessionStorage.removeItem("pos_logged_in"); sessionStorage.removeItem("pos_current_user"); window.location.hash = ""; };
 
   const filteredProducts = products.filter((p) =>
     (catFilter === "All" || p.category === catFilter) &&
@@ -497,6 +534,18 @@ export default function FullPOS() {
 
   // ── RENDER ──
   if (!loaded) return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: S.font, background: S.bg, color: "#111827" }}>Loading...</div>;
+
+  if (storeMode) {
+    return (
+      <StoreFront 
+        products={products} 
+        categories={categories} 
+        storeSettings={storeSettings} 
+        onPlaceOrder={handlePlaceOnlineOrder} 
+        isWholesale={isWholesale}
+      />
+    );
+  }
 
   if (!isLoggedIn) {
     return (
@@ -511,7 +560,7 @@ export default function FullPOS() {
             {toast.msg}
           </div>
         )}
-        <div style={{ ...S.card, padding: "32px", width: "320px", textAlign: "center" }} className="fade-in">
+        <div style={{ ...S.card, padding: "32px", width: "100%", maxWidth: "320px", margin: "0 16px", textAlign: "center", boxSizing: "border-box" }} className="fade-in">
           <div style={{ fontSize: "48px", marginBottom: "16px" }}>🏪</div>
           <h2 style={{ margin: "0 0 24px", fontWeight: 900 }}>{storeSettings.name} Login</h2>
           
@@ -544,13 +593,19 @@ export default function FullPOS() {
           <button onClick={handleLogin} style={{ ...S.btn("#059669"), width: "100%", justifyContent: "center", padding: "12px", fontSize: "16px" }}>
             Login
           </button>
+
+          <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid #e5e7eb" }}>
+            <button onClick={() => { setStoreMode(true); window.location.hash = ""; }} style={{ ...S.btn("#f3f4f6", "#111827"), width: "100%", justifyContent: "center", padding: "12px", fontSize: "16px" }}>
+              🛍️ Visit Online Store
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ fontFamily: S.font, background: S.bg, minHeight: "100vh", display: "flex", color: "#111827" }}>
+    <div className="app-container" style={{ fontFamily: S.font, background: S.bg }}>
       <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
       <style>{`
         button:active{transform:scale(0.97)} input:focus{border-color:#111827!important;box-shadow:0 0 0 3px rgba(17,24,39,0.08)}
@@ -560,6 +615,35 @@ export default function FullPOS() {
         @keyframes slideRight{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
         .fade-in{animation:fadeIn 0.25s ease} .slide-r{animation:slideRight 0.2s ease}
+        .app-container { display: flex; min-height: 100vh; color: #111827; }
+        .sidebar { width: 68px; background: #111827; display: flex; flex-direction: column; align-items: center; padding-top: 16px; gap: 4px; flex-shrink: 0; z-index: 100; }
+        .sidebar-btn { width: 52px; height: 52px; border: none; border-radius: 12px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; transition: all 0.15s; }
+        .main-content { flex: 1; overflow: auto; height: 100vh; }
+        .pos-layout { display: grid; grid-template-columns: 1fr 380px; height: 100vh; }
+        .pos-products { padding: 16px 20px; overflow: auto; }
+        .pos-cart { background: #fff; border-left: 1px solid #e5e7eb; display: flex; flex-direction: column; height: 100vh; }
+        .table-responsive { overflow-x: auto; width: 100%; }
+        .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+        .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+        .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        .edit-sale-item { display: grid; grid-template-columns: 1fr 80px 100px 32px; align-items: center; }
+        @media (max-width: 768px) {
+          .app-container { flex-direction: column-reverse; }
+          .sidebar { width: 100%; height: 64px; flex-direction: row; padding: 0 10px; gap: 2px; justify-content: space-between; align-items: center; border-top: 1px solid #374151; }
+          .sidebar-logo { display: none !important; }
+          .sidebar-bottom { margin: 0 !important; flex-direction: row !important; gap: 8px !important; }
+          .sidebar-btn { width: auto; flex: 1; height: 50px; }
+          .main-content { height: calc(100vh - 64px); }
+          .pos-layout { grid-template-columns: 1fr; grid-template-rows: 1fr 45vh; height: calc(100vh - 64px); }
+          .pos-cart { height: auto; border-left: none; border-top: 2px solid #e5e7eb; }
+          .pos-products { padding: 10px; }
+          .grid-2, .grid-3, .grid-4, .grid-5, .form-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .modal-box { width: 95vw !important; min-width: 0 !important; padding: 16px !important; }
+          .header-actions { flex-direction: column; align-items: stretch !important; gap: 8px; width: 100%; }
+          .edit-sale-item { grid-template-columns: 1fr 80px 70px 32px !important; font-size: 11px !important; }
+        }
       `}</style>
 
       {/* ── Toast ── */}
@@ -572,7 +656,7 @@ export default function FullPOS() {
       {/* ── Modal Overlay ── */}
       {modal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 9000, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(2px)" }} onClick={() => setModal(null)}>
-          <div style={{ ...S.card, padding: "24px", minWidth: "420px", maxWidth: "90vw", maxHeight: "80vh", overflow: "auto" }} className="fade-in" onClick={(e) => e.stopPropagation()}>
+          <div style={{ ...S.card, padding: "24px", minWidth: "420px", maxWidth: "90vw", maxHeight: "80vh", overflow: "auto" }} className="fade-in modal-box" onClick={(e) => e.stopPropagation()}>
             {modal}
           </div>
         </div>
@@ -625,16 +709,16 @@ export default function FullPOS() {
       )}
 
       {/* ── Sidebar ── */}
-      <div style={{ width: "68px", background: "#111827", display: "flex", flexDirection: "column", alignItems: "center", paddingTop: "16px", gap: "4px", flexShrink: 0 }}>
-        <div style={{ width: "40px", height: "40px", background: "#059669", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", marginBottom: "20px" }}>🏪</div>
+      <div className="sidebar">
+        <div className="sidebar-logo" style={{ width: "40px", height: "40px", background: "#059669", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", marginBottom: "20px" }}>🏪</div>
         {navItems.map((item) => (
-          <button key={item.id} onClick={() => setActiveTab(item.id)} style={{ width: "52px", height: "52px", border: "none", borderRadius: "12px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", background: activeTab === item.id ? "#1f2937" : "transparent", color: activeTab === item.id ? "#fff" : "#6b7280", transition: "all 0.15s" }}>
+          <button key={item.id} onClick={() => setActiveTab(item.id)} className="sidebar-btn" style={{ background: activeTab === item.id ? "#1f2937" : "transparent", color: activeTab === item.id ? "#fff" : "#6b7280" }}>
             <span style={{ opacity: activeTab === item.id ? 1 : 0.6 }}>{item.icon}</span>
-            <span style={{ fontSize: "9px", fontWeight: 700, fontFamily: S.font }}>{item.label}</span>
+            <span className="sidebar-btn-text" style={{ fontSize: "9px", fontWeight: 700, fontFamily: S.font }}>{item.label}</span>
           </button>
         ))}
         {/* Low stock badge */}
-        <div style={{ marginTop: "auto", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "16px", alignItems: "center" }}>
+        <div className="sidebar-bottom" style={{ marginTop: "auto", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "16px", alignItems: "center" }}>
           {lowStockProducts.length > 0 && (
             <div style={{ position: "relative" }}>
               <button onClick={() => setActiveTab("products")} style={{ width: "40px", height: "40px", border: "none", borderRadius: "10px", background: "#fef3c7", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#92400e" }}>
@@ -652,13 +736,13 @@ export default function FullPOS() {
       </div>
 
       {/* ── Main Content ── */}
-      <div style={{ flex: 1, overflow: "auto", height: "100vh" }}>
+      <div className="main-content">
 
         {/* ═══════════════ POS TAB ═══════════════ */}
         {activeTab === "pos" && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", height: "100vh" }}>
+          <div className="pos-layout">
             {/* Left - Products */}
-            <div style={{ padding: "16px 20px", overflow: "auto" }}>
+            <div className="pos-products">
               {/* Search + Barcode */}
               <div style={{ display: "flex", gap: "10px", marginBottom: "14px" }}>
                 <div style={{ flex: 1, position: "relative" }}>
@@ -674,7 +758,7 @@ export default function FullPOS() {
                       {heldOrders.map((h) => (
                         <div key={h.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #f3f4f6" }}>
                           <div>
-                            <div style={{ fontWeight: 700, fontSize: "13px" }}>{h.cart.length} items · {fmt(h.cart.reduce((s, i) => s + i.price * i.qty, 0))}</div>
+                            <div style={{ fontWeight: 700, fontSize: "13px" }}>{h.customer?.isOnline ? `🌐 ${h.customer.name}` : 'Held Order'} · {h.cart.length} items · {fmt(h.cart.reduce((s, i) => s + i.price * i.qty, 0))}</div>
                             <div style={{ fontSize: "11px", color: "#6b7280" }}>{fmtFull(h.date)}</div>
                           </div>
                           <button onClick={() => { recallOrder(h.id); setModal(null); }} style={S.btn("#059669")}>Recall</button>
@@ -739,7 +823,7 @@ export default function FullPOS() {
             </div>
 
             {/* Right - Cart Panel */}
-            <div style={{ background: "#fff", borderLeft: "1px solid #e5e7eb", display: "flex", flexDirection: "column", height: "100vh" }}>
+            <div className="pos-cart">
               {/* Cart Header */}
               <div style={{ padding: "14px 16px", borderBottom: "1px solid #e5e7eb" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -795,7 +879,7 @@ export default function FullPOS() {
 
               {/* Cart Footer */}
               {cart.length > 0 && (
-                <div style={{ padding: "14px 16px", borderTop: "1px solid #e5e7eb", background: "#fafafa" }}>
+                <div className="cart-summary" style={{ padding: "14px 16px", borderTop: "1px solid #e5e7eb", background: "#fafafa" }}>
                   {/* Discount */}
                   <div style={{ marginBottom: "10px" }}>
                     <div style={S.label}>Order Discount</div>
@@ -864,7 +948,7 @@ export default function FullPOS() {
         {/* ═══════════════ SALES HISTORY ═══════════════ */}
         {activeTab === "history" && (
           <div style={{ padding: "20px 24px", maxWidth: "1100px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
+            <div className="header-actions" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
               <h2 style={{ margin: 0, fontWeight: 900, fontSize: "20px" }}>Sales History</h2>
               <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                 <div style={{ display: "flex", gap: "4px", background: "#fff", borderRadius: "10px", padding: "3px", border: "1px solid #e5e7eb" }}>
@@ -877,7 +961,7 @@ export default function FullPOS() {
             </div>
 
             {/* Summary */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "12px", marginBottom: "20px" }}>
+            <div className="grid-5" style={{ marginBottom: "20px" }}>
               {[
                 { l: "Revenue", v: fmt(totals.revenue), c: "#2563eb", icon: "💰" },
                 { l: "Cost", v: fmt(totals.cost), c: "#dc2626", icon: "📦" },
@@ -897,7 +981,7 @@ export default function FullPOS() {
               {filtered.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "48px", color: "#9ca3af" }}>No sales found</div>
               ) : filtered.map((sale) => (
-                <div key={sale.id} style={{ padding: "14px 16px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div key={sale.id} style={{ padding: "14px 16px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
                   <div>
                     <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                       <span style={{ fontWeight: 800, fontSize: "13px", fontFamily: S.mono }}>{sale.receiptNo}</span>
@@ -912,7 +996,7 @@ export default function FullPOS() {
                       {fmtFull(sale.date)} · {sale.customerName} · {sale.items.map((i) => `${i.name}×${i.qty}`).join(", ")}
                     </div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontFamily: S.mono, fontWeight: 800, fontSize: "16px" }}>{fmt(sale.grandTotal)}</div>
                       <div style={{ fontSize: "11px", color: "#059669", fontWeight: 700 }}>+{fmt(sale.totalProfit)}</div>
@@ -931,11 +1015,11 @@ export default function FullPOS() {
             {/* Edit Sale Modal */}
             {editSale && (
               <div onClick={() => setEditSale(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "16px", padding: "28px", width: "520px", maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+                <div onClick={(e) => e.stopPropagation()} className="modal-box" style={{ background: "#fff", borderRadius: "16px", padding: "28px", width: "520px", maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
                   <h3 style={{ margin: "0 0 20px", fontWeight: 800, fontSize: "16px" }}>Edit Sale · {editSale.receiptNo}</h3>
 
                   {/* Info fields */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+                  <div className="grid-2" style={{ marginBottom: "20px" }}>
                     <div>
                       <div style={S.label}>Customer Name</div>
                       <input value={editSale.customerName} onChange={(e) => setEditSale({ ...editSale, customerName: e.target.value })} style={S.input} />
@@ -959,11 +1043,11 @@ export default function FullPOS() {
                   {/* Items */}
                   <div style={S.label}>Items</div>
                   <div style={{ border: "1px solid #e5e7eb", borderRadius: "10px", overflow: "hidden", marginBottom: "16px" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 80px 100px 32px", gap: "0", background: "#f9fafb", padding: "8px 12px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase" }}>
+                    <div className="edit-sale-item" style={{ background: "#f9fafb", padding: "8px 12px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase" }}>
                       <span>Item</span><span style={{ textAlign: "center" }}>Qty</span><span style={{ textAlign: "right" }}>Subtotal</span><span />
                     </div>
                     {editSale.items.map((item, idx) => (
-                      <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 80px 100px 32px", alignItems: "center", padding: "10px 12px", borderTop: "1px solid #f3f4f6" }}>
+                      <div key={idx} className="edit-sale-item" style={{ padding: "10px 12px", borderTop: "1px solid #f3f4f6" }}>
                         <div>
                           <div style={{ fontWeight: 700, fontSize: "13px" }}>{item.name}</div>
                           <div style={{ fontSize: "11px", color: "#9ca3af" }}>{fmt(item.price)} each</div>
@@ -999,7 +1083,7 @@ export default function FullPOS() {
         {/* ═══════════════ PRODUCTS ═══════════════ */}
         {activeTab === "products" && (
           <div style={{ padding: "20px 24px", maxWidth: "1100px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+            <div className="header-actions" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <h2 style={{ margin: 0, fontWeight: 900, fontSize: "20px" }}>Products & Inventory</h2>
               <div style={{ display: "flex", gap: "8px" }}>
                 <button onClick={() => {
@@ -1009,7 +1093,7 @@ export default function FullPOS() {
             </div>
 
             {/* Inventory Value Summary */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "20px" }}>
+            <div className="grid-2" style={{ marginBottom: "20px" }}>
               {[
                 { l: "Total Items in Stock", v: products.reduce((s, p) => s + (p.stock || 0), 0), c: "#374151", icon: "📦" },
                 { l: "Total Inventory Cost", v: fmt(products.reduce((s, p) => s + ((p.cost || 0) * (p.stock || 0)), 0)), c: "#dc2626", icon: "💰" },
@@ -1039,7 +1123,7 @@ export default function FullPOS() {
             {editProduct && (
               <div style={{ ...S.card, padding: "20px", marginBottom: "16px", border: "2px solid #111827" }} className="fade-in">
                 <h3 style={{ margin: "0 0 16px", fontWeight: 800 }}>{editProduct.id ? "Edit Product" : "New Product"}</h3>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "12px" }}>
+                <div className="form-grid" style={{ marginBottom: "12px" }}>
                   {[
                     { key: "name", label: "Name", type: "text", ph: "Product name" },
                     { key: "sku", label: "SKU", type: "text", ph: "e.g. DRK-001" },
@@ -1106,8 +1190,8 @@ export default function FullPOS() {
             )}
 
             {/* Stock Adjustment */}
-            <div style={S.card}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+            <div style={S.card} className="table-responsive">
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", minWidth: "800px" }}>
                 <thead>
                   <tr style={{ borderBottom: "2px solid #e5e7eb" }}>
                     {["Product", "SKU", "Category", "Cost", "Retail", "Wholesale", "Margin", "Stock", "Date Added", "Actions"].map((h) => (
@@ -1176,21 +1260,21 @@ export default function FullPOS() {
         {/* ═══════════════ CUSTOMERS ═══════════════ */}
         {activeTab === "customers" && (
           <div style={{ padding: "20px 24px", maxWidth: "1100px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+            <div className="header-actions" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <h2 style={{ margin: 0, fontWeight: 900, fontSize: "20px" }}>Customers</h2>
               <button onClick={() => setModal(
                 <CustomerForm onSave={(c) => { setCustomers((p) => [...p, { ...c, id: ID(), totalSpent: 0, visits: 0, loyaltyPoints: 0, createdAt: new Date().toISOString() }]); setModal(null); notify("Customer added!"); }} />
               )} style={S.btn()}>{Icons.plus} Add Customer</button>
             </div>
 
-            <div style={S.card}>
+            <div style={S.card} className="table-responsive">
               {customers.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "48px", color: "#9ca3af" }}>
                   <div style={{ fontSize: "36px", marginBottom: "8px" }}>👥</div>
                   No customers yet. Add your first customer above.
                 </div>
               ) : (
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", minWidth: "700px" }}>
                   <thead>
                     <tr style={{ borderBottom: "2px solid #e5e7eb" }}>
                       {["Name", "Phone", "Email", "Visits", "Total Spent", "Loyalty Points", "Last Visit", "Actions"].map((h) => (
@@ -1226,7 +1310,7 @@ export default function FullPOS() {
         {/* ═══════════════ DASHBOARD ═══════════════ */}
         {activeTab === "dashboard" && (
           <div style={{ padding: "20px 24px", maxWidth: "1100px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+            <div className="header-actions" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <h2 style={{ margin: 0, fontWeight: 900, fontSize: "20px" }}>Dashboard</h2>
               <div style={{ display: "flex", gap: "8px" }}>
                 <div style={{ display: "flex", gap: "4px", background: "#fff", borderRadius: "10px", padding: "3px", border: "1px solid #e5e7eb" }}>
@@ -1239,7 +1323,7 @@ export default function FullPOS() {
             </div>
 
             {/* KPIs */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px", marginBottom: "20px" }}>
+            <div className="grid-4" style={{ marginBottom: "20px" }}>
               {[
                 { l: "Net Revenue", v: fmt(netRevenue), c: "#2563eb", sub: `${totals.transactions} sales` },
                 { l: "Gross Profit", v: fmt(totals.profit), c: "#059669", sub: `Margin: ${pct(totals.profit, totals.revenue)}` },
@@ -1255,7 +1339,7 @@ export default function FullPOS() {
             </div>
 
             {/* Charts Section */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+            <div className="grid-2" style={{ marginBottom: "20px" }}>
               {/* Top Products */}
               <div style={{ ...S.card, padding: "20px" }}>
                 <h3 style={{ margin: "0 0 16px", fontWeight: 800, fontSize: "14px" }}>🏆 Top Products by Revenue</h3>
@@ -1322,7 +1406,7 @@ export default function FullPOS() {
             </div>
 
             {/* Daily Breakdown */}
-            <div style={{ ...S.card, padding: "20px" }}>
+            <div style={{ ...S.card, padding: "20px" }} className="table-responsive">
               <h3 style={{ margin: "0 0 16px", fontWeight: 800, fontSize: "14px" }}>📅 Daily Breakdown</h3>
               {(() => {
                 const dm = {};
@@ -1334,7 +1418,7 @@ export default function FullPOS() {
                 const days = Object.entries(dm).sort((a, b) => new Date(b[0]) - new Date(a[0])).slice(0, 14);
                 if (!days.length) return <div style={{ color: "#9ca3af", textAlign: "center", padding: "20px" }}>No data</div>;
                 return (
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", minWidth: "500px" }}>
                     <thead>
                       <tr style={{ borderBottom: "2px solid #e5e7eb" }}>
                         {["Date", "Sales", "Revenue", "Cost", "Profit", "Tax", "Margin"].map((h) => (
@@ -1367,7 +1451,7 @@ export default function FullPOS() {
           <div style={{ padding: "20px 24px", maxWidth: "700px" }}>
             <h2 style={{ margin: "0 0 20px", fontWeight: 900, fontSize: "20px" }}>Store Settings</h2>
             <div style={{ ...S.card, padding: "24px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              <div className="grid-2" style={{ gap: "16px" }}>
                 {[
                   { key: "name", label: "Store Name", ph: "My Store" },
                   { key: "phone", label: "Phone", ph: "+856 20 xxxx xxxx" },
