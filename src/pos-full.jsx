@@ -144,8 +144,19 @@ export default function FullPOS() {
   const barcodeRef = useRef(null);
 
   // ── Login State ──
-  const [isLoggedIn, setIsLoggedIn] = useState(() => typeof sessionStorage !== "undefined" && sessionStorage.getItem("pos_logged_in") === "true");
-  const [currentUser, setCurrentUser] = useState(() => typeof sessionStorage !== "undefined" ? sessionStorage.getItem("pos_current_user") : "");
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("pos_logged_in") === "true" || localStorage.getItem("pos_logged_in") === "true";
+    }
+    return false;
+  });
+  const [currentUser, setCurrentUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("pos_current_user") || localStorage.getItem("pos_current_user") || "";
+    }
+    return "";
+  });
+  const [rememberMe, setRememberMe] = useState(false);
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [storeId, setStoreId] = useState(() => {
@@ -162,7 +173,10 @@ export default function FullPOS() {
   const [storeMode, setStoreMode] = useState(() => {
     if (typeof window !== "undefined" && window.location.hash === "#login") return false;
     if (typeof window !== "undefined" && window.location.hash === "#wholesale") return true;
-    return !(typeof sessionStorage !== "undefined" && sessionStorage.getItem("pos_logged_in") === "true");
+    if (typeof window !== "undefined") {
+      return !(sessionStorage.getItem("pos_logged_in") === "true" || localStorage.getItem("pos_logged_in") === "true");
+    }
+    return true;
   });
   const [isWholesale, setIsWholesale] = useState(() => {
     return typeof window !== "undefined" && window.location.hash === "#wholesale";
@@ -542,8 +556,13 @@ export default function FullPOS() {
     if (user) {
       setIsLoggedIn(true);
       setCurrentUser(user.username);
-      sessionStorage.setItem("pos_logged_in", "true");
-      sessionStorage.setItem("pos_current_user", user.username);
+      if (rememberMe) {
+        localStorage.setItem("pos_logged_in", "true");
+        localStorage.setItem("pos_current_user", user.username);
+      } else {
+        sessionStorage.setItem("pos_logged_in", "true");
+        sessionStorage.setItem("pos_current_user", user.username);
+      }
       setLoginUsername("");
       setLoginPassword("");
     } else {
@@ -551,7 +570,7 @@ export default function FullPOS() {
     }
   };
 
-  const handleLogout = () => { setIsLoggedIn(false); setCurrentUser(""); setStoreMode(true); sessionStorage.removeItem("pos_logged_in"); sessionStorage.removeItem("pos_current_user"); window.location.hash = ""; };
+  const handleLogout = () => { setIsLoggedIn(false); setCurrentUser(""); setStoreMode(true); sessionStorage.removeItem("pos_logged_in"); sessionStorage.removeItem("pos_current_user"); localStorage.removeItem("pos_logged_in"); localStorage.removeItem("pos_current_user"); window.location.hash = ""; };
 
   const filteredProducts = products.filter((p) =>
     (catFilter === "All" || p.category === catFilter) &&
@@ -630,6 +649,17 @@ export default function FullPOS() {
               onKeyDown={(e) => { if (e.key === "Enter") handleLogin(); }}
               style={{ ...S.input, fontSize: "16px" }} 
             />
+          </div>
+
+          <div style={{ marginBottom: "24px", textAlign: "left", display: "flex", alignItems: "center", gap: "8px" }}>
+            <input 
+              id="rememberMe"
+              type="checkbox" 
+              checked={rememberMe} 
+              onChange={(e) => setRememberMe(e.target.checked)} 
+              style={{ cursor: "pointer", width: "16px", height: "16px" }}
+            />
+            <label htmlFor="rememberMe" style={{ fontSize: "14px", color: "#6b7280", cursor: "pointer", userSelect: "none", fontWeight: 600 }}>Remember me</label>
           </div>
 
           <button onClick={handleLogin} style={{ ...S.btn("#059669"), width: "100%", justifyContent: "center", padding: "12px", fontSize: "16px" }}>
