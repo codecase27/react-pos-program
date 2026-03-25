@@ -16,17 +16,8 @@ const USERS = [
   { username: "taiy", pass: "Vgtbhatv423" },
   { username: "ning", pass: "54571212" }
 ];
-const DEFAULT_CATS = ["Drinks", "Food", "Snacks", "Other"];
-const DEFAULT_PRODUCTS = [
-  { id: "p1", name: "Lao Coffee", sku: "DRK-001", cost: 8000, price: 15000, wholesalePrice: 12000, category: "Drinks", stock: 100, lowStockThreshold: 10, unit: "cup", barcode: "8850001" },
-  { id: "p2", name: "Green Tea", sku: "DRK-002", cost: 5000, price: 10000, wholesalePrice: 8000, category: "Drinks", stock: 80, lowStockThreshold: 10, unit: "cup", barcode: "8850002" },
-  { id: "p3", name: "Baguette Sandwich", sku: "FOD-001", cost: 12000, price: 25000, wholesalePrice: 20000, category: "Food", stock: 30, lowStockThreshold: 5, unit: "pc", barcode: "8850003" },
-  { id: "p4", name: "Khao Piak Sen", sku: "FOD-002", cost: 15000, price: 30000, wholesalePrice: 24000, category: "Food", stock: 25, lowStockThreshold: 5, unit: "bowl", barcode: "8850004" },
-  { id: "p5", name: "Sticky Rice", sku: "FOD-003", cost: 3000, price: 5000, wholesalePrice: 4000, category: "Food", stock: 50, lowStockThreshold: 10, unit: "portion", barcode: "8850005" },
-  { id: "p6", name: "Fresh Juice", sku: "DRK-003", cost: 7000, price: 15000, wholesalePrice: 12000, category: "Drinks", stock: 40, lowStockThreshold: 8, unit: "glass", barcode: "8850006" },
-  { id: "p7", name: "Water Bottle", sku: "DRK-004", cost: 2000, price: 5000, wholesalePrice: 3500, category: "Drinks", stock: 200, lowStockThreshold: 20, unit: "bottle", barcode: "8850007" },
-  { id: "p8", name: "Lao Chips", sku: "SNK-001", cost: 4000, price: 8000, wholesalePrice: 6500, category: "Snacks", stock: 60, lowStockThreshold: 10, unit: "bag", barcode: "8850008" },
-];
+const DEFAULT_CATS = ["Other"];
+const DEFAULT_PRODUCTS = [];
 
 const TAX_RATE = 0; // Set to e.g. 0.10 for 10% tax
 
@@ -199,14 +190,15 @@ export default function FullPOS() {
   useEffect(() => {
     (async () => {
       setLoaded(false);
-      const [p, s, c, h, st] = await Promise.all([
+      const [p, s, c, h, st, cats] = await Promise.all([
         loadData(storeId, "products", DEFAULT_PRODUCTS),
         loadData(storeId, "sales", []),
         loadData(storeId, "customers", []),
         loadData(storeId, "held", []),
         loadData(storeId, "settings", { name: storeId === "pos2" ? "Main Store" : "Second Store", phone: "", address: "", taxRate: 0, currency: "₭", receiptFooter: "Thank you for your visit!" }),
+        loadData(storeId, "categories", DEFAULT_CATS),
       ]);
-      setProducts(p); setSales(s); setCustomers(c); setHeldOrders(h); setStoreSettings(st);
+      setProducts(p); setSales(s); setCustomers(c); setHeldOrders(h); setStoreSettings(st); setCategories(cats);
       setLoaded(true);
     })();
   }, [storeId]);
@@ -216,6 +208,7 @@ export default function FullPOS() {
   useEffect(() => { if (loaded) saveData(storeId, "customers", customers); }, [customers, loaded, storeId]);
   useEffect(() => { if (loaded) saveData(storeId, "held", heldOrders); }, [heldOrders, loaded, storeId]);
   useEffect(() => { if (loaded) saveData(storeId, "settings", storeSettings); }, [storeSettings, loaded, storeId]);
+  useEffect(() => { if (loaded) saveData(storeId, "categories", categories); }, [categories, loaded, storeId]);
 
   // ── Listen for hidden login URL shortcut ──
   useEffect(() => {
@@ -1554,7 +1547,7 @@ export default function FullPOS() {
                 {categories.map((c) => (
                   <span key={c} style={{ display: "flex", alignItems: "center", gap: "6px", background: getCatColor(c).bg, color: getCatColor(c).text, padding: "6px 12px", borderRadius: "8px", fontWeight: 700, fontSize: "12px" }}>
                     {c}
-                    {!["Drinks", "Food", "Snacks", "Other"].includes(c) && (
+                    {!["Other"].includes(c) && (
                       <button onClick={() => setCategories((p) => p.filter((cc) => cc !== c))} style={{ background: "none", border: "none", cursor: "pointer", color: getCatColor(c).text, fontSize: "14px", padding: 0 }}>×</button>
                     )}
                   </span>
